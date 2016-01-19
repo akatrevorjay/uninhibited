@@ -1,153 +1,5 @@
-"""
-Easy event management.
-"""
-import types
-
-_sentinel = object()
-
-
-class Event(object):
-    """
-    Callback. Register a number of callables and upon fire, it will call each one and return the results.
-
-    Example usage:
-
-    Create instance
-    >>> e = Event()
-
-    Define an example callable:
-    >>> def echo(arg):
-    ...    return arg
-
-    Add the example callable to the event's list of callbacks:
-    >>> e += echo
-
-    You can also use :meth:`add` to do so:
-    >>> e.add(echo)
-
-    Fire the event:
-    >>> e(True)
-    [(<function echo at ...>, True), (<function echo at ...>, True)]
-    >>> e.fire(True)
-    [(<function echo at ...>, True), (<function echo at ...>, True)]
-
-    You can fire the event iteratively via ifire:
-    >>> e.ifire()  # As you can see it returns a generator
-    <generator object ...>
-    >>> list(e.ifire(False))
-    [(<function echo at ...>, False), (<function echo at ...>, False)]
-
-    Some introspections are supported:
-    >>> len(e)
-    2
-    >>> list(e)
-    [<function echo at ...>, <function echo at ...>]
-    """
-
-    def __init__(self, container_factory=list):
-        """
-        Init.
-
-        :param callable container_factory: Factory for callback storage; must support append and remove.
-        """
-        self._handlers = container_factory()
-
-    def add(self, handler):
-        """
-        Add handler.
-
-        :param callable handler: callable handler
-        :return callable: The handler you added is given back so this can be used as a decorator.
-        """
-        self._handlers.append(handler)
-        return handler
-
-    def __iadd__(self, handler):
-        """
-        Inplace add operator (+=) to add a handler.
-
-        :param callable handler: callable handler
-        :return Event: self, as required by inplace operators
-        """
-        self.add(handler)
-        return self
-
-    def remove(self, handler):
-        """
-        Remove handler.
-
-        :param callable handler: callable handler
-        :return callable: The handler you added is given back so this can be used as a decorator.
-        """
-        self._handlers.remove(handler)
-        return handler
-
-    def __isub__(self, handler):
-        """
-        Inplace sub operator (-=) to remove a handler.
-
-        :param callable handler: callable handler
-        :return Event: self, as required by inplace operators
-        """
-        self.remove(handler)
-        return self
-
-    def remove_handlers_bound_to_instance(self, obj):
-        """
-        Remove all handlers bound to given object instance.
-        This is useful to remove all handler methods that are part of an instance.
-
-        :param object obj: Remove handlers that are methods of this instance
-        """
-        for handler in self:
-            if handler.im_self == obj:
-                self -= handler
-
-    def fire(self, *args, **kwargs):
-        """
-        Fire event. call handlers using given arguments, return a list of results.
-
-        :param tuple args: positional arguments to call each handler with
-        :param dict kwargs: keyword arguments to call each handler with
-        :return list: a list of tuples of handler, return value
-        """
-        return [(handler, handler(*args, **kwargs)) for handler in self]
-
-    __call__ = fire
-
-    def ifire(self, *args, **kwargs):
-        """
-        Iteratively fire event, returning generator. Calls each handler using given arguments, upon iteration,
-        yielding each result.
-
-        :param tuple args: positional arguments to call each handler with
-        :param dict kwargs: keyword arguments to call each handler with
-        :return generator: a generator yielding a tuple of handler, return value
-        """
-        for handler in self:
-            yield handler, handler(*args, **kwargs)
-
-    def count(self):
-        """
-        Return handler count.
-
-        :return int: Number of handlers added
-        """
-        return len(self._handlers)
-
-    __len__ = count
-
-    def __iter__(self):
-        """
-        Iterate over handlers.
-
-        :return generator: An iterator over our handlers
-        """
-        for i in self._handlers:
-            yield i
-
-    def __repr__(self):
-        return '<%s %s>' % (self.__class__.__name__, list(self._handlers))
+from uninhibited.utils import _sentinel
+from uninhibited import Event, PriorityEvent
 
 
 class Dispatch(object):
@@ -197,15 +49,18 @@ class Dispatch(object):
     ['on_echo']
     """
 
-    def __init__(
-        self,
-        event_names=None,
-        create_events_on_access=False,
-        create_events_on_fire=True,
-        event_factory=Event,
-        events_mapping_factory=dict,
-        handlers_container_factory=list
-    ):
+    create_events_on_access = False
+    create_events_on_fire = True
+
+    event_factory = Event
+    internal_event_factory = event_factory
+    events_mapping_factory = dict
+    handlers_container_factory = list
+
+    def __init__(self, event_names=None,
+                 create_events_on_access=None, create_events_on_fire=None,
+                 event_factory=None, internal_event_factory=None,
+                 events_mapping_factory=None, handlers_container_factory=None):
         """
         Init.
 
@@ -216,16 +71,32 @@ class Dispatch(object):
         :param callable events_mapping_factory: Factory to create mapping to store events
         :param callable handlers_container_factory: Factory to create container to store handlers
         """
-        self.create_events_on_access = create_events_on_access
-        self.create_events_on_fire = create_events_on_fire
-        self.event_factory = event_factory
+        if create_events_on_access is not None:
+            self.create_events_on_access = create_events_on_access
+        if create_events_on_fire is not None:
+            self.create_events_on_fire = create_events_on_fire
+        if event_factory:
+            self.event_factory = event_factory
+        if internal_event_factory:
+            self.internal_event_factory = internal_event_factory
+        if events_mapping_factory:
+            self.events_mapping_factory = events_mapping_factory
+        if handlers_container_factory:
+            self.handlers_container_factory = handlers_container_factory
 
-        self.handlers = handlers_container_factory()
-        self.events = events_mapping_factory()
+        self.handlers = self.handlers_container_factory()
+        self.events = self.events_mapping_factory()
         self.clear()
 
         if event_names:
+            # Register given events
             self.add_event(*event_names)
+
+    internal_events = ['on_handler_add', 'on_handler_remove', 'on_add_event']
+
+    def _setup_internal_events(self):
+        # Register internal events
+        self.add_internal_event(*self.internal_events)
 
     def clear(self):
         """
@@ -233,6 +104,7 @@ class Dispatch(object):
         """
         del self.handlers[:]
         self.events.clear()
+        self._setup_internal_events()
 
     def get_event(self, name, default=_sentinel):
         """
@@ -272,7 +144,12 @@ class Dispatch(object):
         """
         pass
 
-    def add_event(self, *names):
+    def add_internal_event(self, *names, send_event=False, internal_event_factory=None):
+        if not internal_event_factory:
+            internal_event_factory = self.internal_event_factory
+        return self.add_event(*names, send_event=send_event, event_factory=internal_event_factory)
+
+    def add_event(self, *names, send_event=True, event_factory=None):
         """
         Add event(s) by name.
 
@@ -283,12 +160,18 @@ class Dispatch(object):
 
         :param tuple names: Names
         """
-        for name in names:
-            # Create event
-            self.events[name] = self.event_factory()
-            # Inspect handlers to see if they should be attached to this new event
-            for handler in self.handlers:
-                self._attach_handler_events(handler, events=[name])
+        if not event_factory:
+            event_factory = self.event_factory
+
+        # Create events
+        self.events.update(
+            {name: event_factory() for name in names},
+        )
+        # Inspect handlers to see if they should be attached to this new event
+        [self._attach_handler_events(handler, events=names) for handler in self.handlers]
+
+        if send_event:
+            [self.on_add_event(name) for name in names]
 
     def _attach_handler_events(self, handler, events=None):
         """
@@ -304,7 +187,7 @@ class Dispatch(object):
             if meth:
                 self.events[name] += meth
 
-    def add(self, handler, allow_dupe=False):
+    def _add(self, handler, allow_dupe=False, send_event=True):
         """
         Add handler instance and attach any events to it.
 
@@ -316,6 +199,18 @@ class Dispatch(object):
             raise ValueError("Handler already present: %s" % handler)
         self.handlers.append(handler)
         self._attach_handler_events(handler)
+        if send_event:
+            self.on_handler_add(handler)
+
+    def add(self, handler, allow_dupe=False, send_event=True):
+        """
+        Add handler instance and attach any events to it.
+
+        :param object handler: handler instance
+        :param bool allow_dupe: If True, allow registering a handler more than once.
+        :return object: The handler you added is given back so this can be used as a decorator.
+        """
+        self._add(handler, allow_dupe=allow_dupe, send_event=send_event)
         return handler
 
     def __iadd__(self, handler):
@@ -325,10 +220,10 @@ class Dispatch(object):
         :param object handler: handler instance
         :return Dispatch: self, as required by inplace operators
         """
-        self.add(handler)
+        self._add(handler)
         return self
 
-    def remove(self, handler):
+    def _remove(self, handler, send_event=True):
         """
         Remove handler instance and detach any methods bound to it from uninhibited.
 
@@ -338,6 +233,17 @@ class Dispatch(object):
         for event in self:
             event.remove_handlers_bound_to_instance(handler)
         self.handlers.remove(handler)
+        if send_event:
+            self.on_handler_remove(handler)
+
+    def remove(self, handler):
+        """
+        Remove handler instance and detach any methods bound to it from uninhibited.
+
+        :param object handler: handler instance
+        :return object: The handler you added is given back so this can be used as a decorator.
+        """
+        self._remove(handler)
         return handler
 
     def __isub__(self, handler):
@@ -347,7 +253,7 @@ class Dispatch(object):
         :param object handler: handler instance
         :return Dispatch: self, as required by inplace operators
         """
-        self.remove(handler)
+        self._remove(handler)
         return self
 
     def _maybe_create_on_fire(self, event):
@@ -386,11 +292,12 @@ class Dispatch(object):
         """
         if not self._maybe_create_on_fire(event):
             return
+
         # Wrap the generator per item to force that this method be a generator
         # Python 3.x of course has yield from, which would be great here.
-        gen = self[event].ifire(*args, **kwargs)
-        for item in gen:
-            yield item
+        if False:
+            yield
+        return self[event].ifire(*args, **kwargs)
 
     def count(self):
         """
@@ -412,3 +319,8 @@ class Dispatch(object):
 
     def __repr__(self):
         return '<%s %s handlers=%s>' % (self.__class__.__name__, list(self.events), self.handlers)
+
+
+class PriorityDispatch(Dispatch):
+    event_factory = PriorityEvent
+    internal_event_factory = PriorityEvent
