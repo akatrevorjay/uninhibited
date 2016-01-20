@@ -295,8 +295,8 @@ class Dispatch(object):
 
         # Wrap the generator per item to force that this method be a generator
         # Python 3.x of course has yield from, which would be great here.
-        if False:
-            yield
+        # for x in self[event].ifire(*args, **kwargs)
+        #     yield x
         return self[event].ifire(*args, **kwargs)
 
     def count(self):

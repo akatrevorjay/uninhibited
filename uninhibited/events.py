@@ -1,4 +1,5 @@
 from uninhibited.containers import ListHandlerCollection, SortedDictPriorityHandlerCollection
+from uninhibited.utils import _sentinel
 
 
 class Event(object):
@@ -106,11 +107,13 @@ class Event(object):
             if handler.im_self == obj:
                 self -= handler
 
-    def _call_handler(self, handler, *args, **kwargs):
+    def _call_handler(self, handler, args, kwargs):
         return handler(*args, **kwargs)
 
-    def _results(self, handlers, args, kwargs):
-        return ((h, self._call_handler(h, *args, **kwargs)) for h in handlers)
+    def _results(self, args, kwargs, handlers=_sentinel):
+        if handlers is _sentinel:
+            handlers = self.handlers
+        return ((h, self._call_handler(h, args, kwargs)) for h in handlers)
 
     def fire(self, *args, **kwargs):
         """
@@ -120,7 +123,7 @@ class Event(object):
         :param dict kwargs: keyword arguments to call each handler with
         :return list: a list of tuples of handler, return value
         """
-        return list(self.ifire(*args, **kwargs))
+        return list(self._results(args, kwargs))
 
     def ifire(self, *args, **kwargs):
         """
@@ -131,7 +134,7 @@ class Event(object):
         :param dict kwargs: keyword arguments to call each handler with
         :return generator: a generator yielding a tuple of handler, return value
         """
-        return self._results(self.handlers, args, kwargs)
+        return self._results(args, kwargs)
 
     def __call__(self, *args, **kwargs):
         return self.fire(*args, **kwargs)
@@ -180,5 +183,3 @@ class PriorityEvent(Event):
     def fire_by_priority(self, *args, **kwargs):
         return [(priority, list(results))
                 for priority, results in self.ifire_by_priority(*args, **kwargs)]
-
-
