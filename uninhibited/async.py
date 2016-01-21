@@ -8,6 +8,8 @@ from uninhibited.dispatch import Dispatch
 
 
 class EventFireIter:
+    __slots__ = ('_iter')
+
     def __init__(self, iterator):
         self._iter = iterator
 
@@ -36,7 +38,9 @@ class EventFireIter:
         fs = self
         return await asyncio.gather(*fs)
 
-    __await__ = gather
+    def __await__(self):
+        # Voodoo, yes, but this whole PEP is still a bit broken. Sigh.
+        return self.gather().__await__()
 
     def as_completed(self):
         # as_completed requires a list of futures, not a generator
@@ -103,11 +107,14 @@ class AsyncEventMixin:
         iterator = (meth(handler=handler) for handler in handlers)
         return EventFireIter(iterator)
 
+    """ These are overridden to return our iterator """
+
     def ifire(self, *args, **kwargs):
         fs = self._results(args, kwargs)
         return fs
 
     fire = ifire
+    __call__ = fire
 
 
 class AsyncEvent(AsyncEventMixin, Event):

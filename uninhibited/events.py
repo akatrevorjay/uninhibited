@@ -136,8 +136,7 @@ class Event(object):
         """
         return self._results(args, kwargs)
 
-    def __call__(self, *args, **kwargs):
-        return self.fire(*args, **kwargs)
+    __call__ = fire
 
     def __len__(self):
         """
