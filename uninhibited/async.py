@@ -1,36 +1,28 @@
 import asyncio
 import functools
 import inspect
-import types
 
-import aitertools
-
-from uninhibited.utils import maybe_async, _sentinel
+from uninhibited.utils import _sentinel
 from uninhibited.events import Event, PriorityEvent
 from uninhibited.dispatch import Dispatch
 
 
-class AsyncMixin:
-    pass
-
-
 class EventFireIter:
-    def __init__(self, meth, handlers):
-        self._iter = self._iterable(meth, handlers)
-
-    def _iterable(self, meth, handlers):
-        return (meth(handler=handler) for handler in handlers)
+    def __init__(self, iterator):
+        self._iter = iterator
 
     def __iter__(self):
         return self
 
-    def __next__(self):
+    def next(self):
         return next(self._iter)
+
+    __next__ = next
 
     async def __aiter__(self):
         return self
 
-    async def __anext__(self):
+    async def anext(self):
         """Fetch the next value from the iterable."""
         try:
             f = next(self._iter)
@@ -38,9 +30,41 @@ class EventFireIter:
             raise StopAsyncIteration() from exc
         return await f
 
+    __anext__ = anext
 
-class AsyncEventMixin(AsyncMixin):
-    def _call_handler(self, *, handler, args, kwargs, loop=None, start=False, executor=None):
+    async def gather(self):
+        fs = self
+        return await asyncio.gather(*fs)
+
+    __await__ = gather
+
+    def as_completed(self):
+        # as_completed requires a list of futures, not a generator
+        fs = list(self)
+        # returns an iterator of futures that will only resolve once
+        iterator = asyncio.as_completed(fs)
+        # Return a new instance of this class so you can piggy back .gather or .wait and such
+        return self.__class__(iterator)
+
+    async def wait(self):
+        fs = self
+        return await asyncio.wait(fs)
+
+    def run_until_complete(self, loop=None):
+        if not loop:
+            loop = asyncio.get_event_loop()
+        f = self.gather()
+        return loop.run_until_complete(f)
+
+    def run_in_executor(self, executor=None, loop=None):
+        if not loop:
+            loop = asyncio.get_event_loop()
+        # TODO untested
+        return loop.run_in_executor(executor, self.run_until_complete)
+
+
+class AsyncEventMixin:
+    def _call_handler(self, *, handler, args, kwargs, loop=None, start=True, executor=None):
         if loop is None:
             loop = asyncio.get_event_loop()
 
@@ -64,43 +88,26 @@ class AsyncEventMixin(AsyncMixin):
     async def _result_tuple(self, handler, f):
         return handler, await f
 
-    def _results(self, args, kwargs, handlers=_sentinel):
+    def _results(self, args, kwargs, *, handlers=_sentinel, loop=None, start=True, executor=None):
         if handlers is _sentinel:
             handlers = self.handlers
 
-        meth = functools.partial(self._call_handler, args=args, kwargs=kwargs)
-        return EventFireIter(meth, handlers)
+        meth = functools.partial(
+            self._call_handler,
+            args=args,
+            kwargs=kwargs,
+            start=start,
+            executor=executor,
+        )
+
+        iterator = (meth(handler=handler) for handler in handlers)
+        return EventFireIter(iterator)
 
     def ifire(self, *args, **kwargs):
         fs = self._results(args, kwargs)
         return fs
 
-    def fire(self, *args, **kwargs):
-        # Give back the full list of futures, not just the generator
-        return self.ifire(*args, **kwargs)
-
-    def ifire_as_completed(self, *args, **kwargs):
-        # as_completed requires a list of futures, not a generator, hence fire
-        fs = self.fire(*args, **kwargs)
-        # returns an iterator of futures that will only resolve once
-        return asyncio.as_completed(fs)
-
-    def fire_as_completed(self, *args, **kwargs):
-        # Give back the full list of futures, not just the generator
-        return list(self.ifire_as_completed(*args, **kwargs))
-
-    def fire_as_completed_gather(self, *args, **kwargs):
-        # fs = self.fire(*args, **kwargs)
-        fs = self.ifire_as_completed(*args, **kwargs)
-        return asyncio.gather(*fs)
-
-    def ifire_wait(self, *args, **kwargs):
-        fs = self.ifire(*args, **kwargs)
-        return asyncio.wait(fs)
-
-    def ifire_gather(self, *args, **kwargs):
-        fs = self.ifire(*args, **kwargs)
-        return asyncio.gather(*fs)
+    fire = ifire
 
 
 class AsyncEvent(AsyncEventMixin, Event):
@@ -111,7 +118,7 @@ class AsyncPriorityEvent(AsyncEventMixin, PriorityEvent):
     pass
 
 
-class AsyncDispatchMixin(AsyncMixin):
+class AsyncDispatchMixin:
     async def fire_wait(self, event, *args, **kwargs):
         # await ((handler, await f) for handler, f in self.ifire(event, *args, **kwargs))
         results = self.fire(event, *args, **kwargs)
