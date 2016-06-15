@@ -6,6 +6,7 @@ import sortedcontainers
 
 @six.add_metaclass(abc.ABCMeta)
 class HandlerCollection(object):
+
     @abc.abstractmethod
     def add_handler(self, handler):
         raise NotImplementedError()
@@ -34,6 +35,7 @@ class HandlerCollection(object):
 
 
 class ListHandlerCollection(HandlerCollection):
+
     def __init__(self):
         self.handlers = list()
 
@@ -49,6 +51,7 @@ class ListHandlerCollection(HandlerCollection):
 
 @six.add_metaclass(abc.ABCMeta)
 class PriorityHandlerCollection(HandlerCollection):
+
     @abc.abstractmethod
     def add_handler(self, handler, priority=10):
         raise NotImplementedError()
@@ -64,6 +67,7 @@ class PriorityHandlerCollection(HandlerCollection):
 
 
 class SortedDictPriorityHandlerCollection(PriorityHandlerCollection):
+
     def __init__(self):
         self.map = sortedcontainers.SortedDict()
         self.weakmap = weakref.WeakKeyDictionary()

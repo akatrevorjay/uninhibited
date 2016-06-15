@@ -12,6 +12,7 @@ _HAS_ASYNCIO = HAS_ASYNCIO
 _sentinel = object()
 
 if HAS_ASYNCIO:
+
     def maybe_async(value):
         if isinstance(value, (types.CoroutineType, types.GeneratorType, asyncio.Future)):
             return value

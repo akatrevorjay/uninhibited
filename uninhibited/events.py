@@ -176,9 +176,7 @@ class PriorityEvent(Event):
         return self.container.iter_handlers_by_priority()
 
     def ifire_by_priority(self, *args, **kwargs):
-        return ((priority, self._results(handlers, args, kwargs))
-                for priority, handlers in self.handlers_by_priority)
+        return ((priority, self._results(handlers, args, kwargs)) for priority, handlers in self.handlers_by_priority)
 
     def fire_by_priority(self, *args, **kwargs):
-        return [(priority, list(results))
-                for priority, results in self.ifire_by_priority(*args, **kwargs)]
+        return [(priority, list(results)) for priority, results in self.ifire_by_priority(*args, **kwargs)]

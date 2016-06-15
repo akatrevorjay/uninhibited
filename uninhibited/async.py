@@ -68,6 +68,7 @@ class EventFireIter:
 
 
 class AsyncEventMixin:
+
     def _call_handler(self, *, handler, args, kwargs, loop=None, start=True, executor=None):
         if loop is None:
             loop = asyncio.get_event_loop()
@@ -96,13 +97,11 @@ class AsyncEventMixin:
         if handlers is _sentinel:
             handlers = self.handlers
 
-        meth = functools.partial(
-            self._call_handler,
-            args=args,
-            kwargs=kwargs,
-            start=start,
-            executor=executor,
-        )
+        meth = functools.partial(self._call_handler,
+                                 args=args,
+                                 kwargs=kwargs,
+                                 start=start,
+                                 executor=executor,)
 
         iterator = (meth(handler=handler) for handler in handlers)
         return EventFireIter(iterator)
@@ -126,6 +125,7 @@ class AsyncPriorityEvent(AsyncEventMixin, PriorityEvent):
 
 
 class AsyncDispatchMixin:
+
     async def fire_wait(self, event, *args, **kwargs):
         # await ((handler, await f) for handler, f in self.ifire(event, *args, **kwargs))
         results = self.fire(event, *args, **kwargs)

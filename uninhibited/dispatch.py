@@ -57,10 +57,16 @@ class Dispatch(object):
     events_mapping_factory = dict
     handlers_container_factory = list
 
-    def __init__(self, event_names=None,
-                 create_events_on_access=None, create_events_on_fire=None,
-                 event_factory=None, internal_event_factory=None,
-                 events_mapping_factory=None, handlers_container_factory=None):
+    def __init__(
+        self,
+        event_names=None,
+        create_events_on_access=None,
+        create_events_on_fire=None,
+        event_factory=None,
+        internal_event_factory=None,
+        events_mapping_factory=None,
+        handlers_container_factory=None
+    ):
         """
         Init.
 
@@ -164,9 +170,7 @@ class Dispatch(object):
             event_factory = self.event_factory
 
         # Create events
-        self.events.update(
-            {name: event_factory() for name in names},
-        )
+        self.events.update({name: event_factory() for name in names},)
         # Inspect handlers to see if they should be attached to this new event
         [self._attach_handler_events(handler, events=names) for handler in self.handlers]
 
