@@ -7,8 +7,6 @@ Tested with Python 2.7, 3.4, 3.5.
 
 |Test Status| |Coverage Status| |Documentation Status|
 
--  Docs: http://uninhibited.readthedocs.org/en/latest
--  API Docs: http://uninhibited.readthedocs.org/en/latest/uninhibited.html
 -  PyPi: https://pypi.python.org/pypi/uninhibited
 
 
