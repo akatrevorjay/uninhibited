@@ -1,4 +1,4 @@
-from uninhibited.containers import ListHandlerCollection, SortedDictPriorityHandlerCollection
+from uninhibited import containers
 from uninhibited.utils import _sentinel
 
 
@@ -20,6 +20,7 @@ class Event(object):
 
     You can also use :meth:`add` to do so:
     >>> e.add(echo)
+    <function echo at ...>
 
     Fire the event:
     >>> e(True)
@@ -40,7 +41,7 @@ class Event(object):
     [<function echo at ...>, <function echo at ...>]
     """
 
-    _container_factory = ListHandlerCollection
+    _container_factory = containers.ListHandlerCollection
 
     def __init__(self, container_factory=None):
         """
@@ -144,7 +145,7 @@ class Event(object):
 
         :return int: Number of handlers added
         """
-        return len(self.handlers)
+        return len(list(self.handlers))
 
     def __iter__(self):
         """
@@ -159,7 +160,7 @@ class Event(object):
 
 
 class PriorityEvent(Event):
-    _container_factory = SortedDictPriorityHandlerCollection
+    _container_factory = containers.SortedDictPriorityHandlerCollection
 
     def add(self, handler, priority=10):
         """

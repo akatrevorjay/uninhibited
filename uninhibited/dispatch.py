@@ -29,6 +29,7 @@ class Dispatch(object):
     You can also use :meth:`add` to do so:
     Duplicates are not allowed by default, unless you specify.
     >>> d.add(handler, allow_dupe=True)
+    <uninhibited.dispatch.Handler object at ...>
 
     Fire the event:
     >>> d('on_echo', True)
@@ -44,9 +45,9 @@ class Dispatch(object):
 
     Some introspections are supported:
     >>> len(d)
-    1
+    4
     >>> list(d)
-    ['on_echo']
+    [...]
     """
 
     create_events_on_access = False
@@ -102,7 +103,7 @@ class Dispatch(object):
 
     def _setup_internal_events(self):
         # Register internal events
-        self.add_internal_event(*self.internal_events)
+        self._add_internal_events(self.internal_events)
 
     def clear(self):
         """
@@ -150,14 +151,22 @@ class Dispatch(object):
         """
         pass
 
-    def add_internal_event(self, *names, send_event=False, internal_event_factory=None):
+    def _add_internal_event(self, name, send_event=False, internal_event_factory=None):
+        """
+        This is only here to ensure my constant hatred for Python 2's horrid variable argument support.
+        """
         if not internal_event_factory:
             internal_event_factory = self.internal_event_factory
-        return self.add_event(*names, send_event=send_event, event_factory=internal_event_factory)
+        return self.add_event(names, send_event=send_event, event_factory=internal_event_factory)
 
-    def add_event(self, *names, send_event=True, event_factory=None):
+    def _add_internal_events(self, names, send_event=False, internal_event_factory=None):
+        if not internal_event_factory:
+            internal_event_factory = self.internal_event_factory
+        return self.add_events(names, send_event=send_event, event_factory=internal_event_factory)
+
+    def add_events(self, names, send_event=True, event_factory=None):
         """
-        Add event(s) by name.
+        Add event by name.
 
         This is called for you as needed if you allow auto creation of events (see __init__).
 
@@ -176,6 +185,21 @@ class Dispatch(object):
 
         if send_event:
             [self.on_add_event(name) for name in names]
+
+    def add_event(self, name, send_event=True, event_factory=None):
+        """
+        Add event by name.
+
+        This is called for you as needed if you allow auto creation of events (see __init__).
+
+        Upon an event being added, all handlers are searched for if they have this event,
+        and if they do, they are added to the Event's list of callables.
+
+        This is only here to ensure my constant hatred for Python 2's horrid variable argument support.
+
+        :param str|unicode name: Name
+        """
+        return self.add_events((name,),send_event=send_event,event_factory=event_factory)
 
     def _attach_handler_events(self, handler, events=None):
         """

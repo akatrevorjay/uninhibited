@@ -1,6 +1,9 @@
 import types
+import sys
 
 try:
+    if sys.version_info < (3,5):
+        raise ImportError("Python 3.5+ required")
     import asyncio
 
     HAS_ASYNCIO = True
