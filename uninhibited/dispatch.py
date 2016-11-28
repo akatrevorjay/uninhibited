@@ -97,7 +97,7 @@ class Dispatch(object):
 
         if event_names:
             # Register given events
-            self.add_event(*event_names)
+            self.add_events(event_names)
 
     internal_events = ['on_handler_add', 'on_handler_remove', 'on_add_event']
 
