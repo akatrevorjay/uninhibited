@@ -30,7 +30,7 @@ RUN set -exv \
 ADD requirements requirements
 RUN install-reqs requirements/*
 
-ADD setup.cfg setup.py MANIFEST.in README.rst ./
+ADD setup.cfg setup.py MANIFEST.in README.* ./
 
 ARG UNINHIBITED_VERSION=0.0.1dev
 
