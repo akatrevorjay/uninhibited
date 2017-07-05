@@ -1,6 +1,8 @@
 FROM trevorj/boilerplate:rolling
 MAINTAINER Trevor Joynson "<docker@trevor.joynson.io>"
 
+ARG APP_ENV=test
+
 ##
 ## Python base
 ##
