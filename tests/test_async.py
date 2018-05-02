@@ -79,10 +79,14 @@ def ape_as_completed():
             yield p, f, r
 
 
-async def test_aiter():
-    gen = ape.ifire('test')
-    ret = []
-    async for handler, result in gen:
-        print(handler, result)
-        ret.append((handler, result))
-    return ret
+def test_aiter():
+    async def _inner():
+        gen = ape.ifire('test')
+        ret = []
+        async for handler, result in gen:
+            print(handler, result)
+            ret.append((handler, result))
+        return ret
+    f = _inner()
+    r = loop.run_until_complete(f)
+    return r
