@@ -21,7 +21,7 @@ class EventFireIter:
 
     __next__ = next
 
-    async def __aiter__(self):
+    def __aiter__(self):
         return self
 
     async def anext(self):
