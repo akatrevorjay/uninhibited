@@ -93,4 +93,4 @@ if _HAS_SORTED_CONTAINERS:
                 del self.map[priority]
 
         def iter_handlers_by_priority(self):
-            return self.map.iteritems()
+            return self.map.items()
