@@ -81,7 +81,7 @@ if _HAS_SORTED_CONTAINERS:
             self.weakmap = weakref.WeakKeyDictionary()
 
         def add_handler(self, handler, priority=10):
-            if not priority in self.map:
+            if priority not in self.map:
                 self.map[priority] = list()
             self.map[priority].append(handler)
             self.weakmap[handler] = priority
@@ -93,4 +93,4 @@ if _HAS_SORTED_CONTAINERS:
                 del self.map[priority]
 
         def iter_handlers_by_priority(self):
-            return self.map.iteritems()
+            return self.map.items()
