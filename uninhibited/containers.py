@@ -2,13 +2,7 @@ import abc
 import weakref
 import six
 import warnings
-
-try:
-    import sortedcontainers
-    _HAS_SORTED_CONTAINERS = True
-except ImportError:
-    warnings.warn("SortedDictPriorityHandlerCollection will not be available, missing sortedcontainers package.")
-    _HAS_SORTED_CONTAINERS = False
+import sortedcontainers
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -73,24 +67,23 @@ class PriorityHandlerCollection(HandlerCollection):
         raise NotImplementedError()
 
 
-if _HAS_SORTED_CONTAINERS:
-    class SortedDictPriorityHandlerCollection(PriorityHandlerCollection):
+class SortedDictPriorityHandlerCollection(PriorityHandlerCollection):
 
-        def __init__(self):
-            self.map = sortedcontainers.SortedDict()
-            self.weakmap = weakref.WeakKeyDictionary()
+    def __init__(self):
+        self.map = sortedcontainers.SortedDict()
+        self.weakmap = weakref.WeakKeyDictionary()
 
-        def add_handler(self, handler, priority=10):
-            if priority not in self.map:
-                self.map[priority] = list()
-            self.map[priority].append(handler)
-            self.weakmap[handler] = priority
+    def add_handler(self, handler, priority=10):
+        if priority not in self.map:
+            self.map[priority] = list()
+        self.map[priority].append(handler)
+        self.weakmap[handler] = priority
 
-        def remove_handler(self, handler):
-            priority = self.weakmap.pop(handler)
-            self.map[priority].remove(handler)
-            if not self.map[priority]:
-                del self.map[priority]
+    def remove_handler(self, handler):
+        priority = self.weakmap.pop(handler)
+        self.map[priority].remove(handler)
+        if not self.map[priority]:
+            del self.map[priority]
 
-        def iter_handlers_by_priority(self):
-            return self.map.items()
+    def iter_handlers_by_priority(self):
+        return self.map.items()
