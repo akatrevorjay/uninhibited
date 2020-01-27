@@ -11,6 +11,6 @@ __all__ = ['Event', 'PriorityEvent', 'Dispatch', 'PriorityDispatch']
 from .utils import _HAS_ASYNCIO
 
 if _HAS_ASYNCIO:
-    from .async import AsyncEvent, AsyncPriorityEvent, AsyncDispatch, AsyncPriorityDispatch
+    from .aio import AsyncEvent, AsyncPriorityEvent, AsyncDispatch, AsyncPriorityDispatch
 
     __all__.extend(['AsyncEvent', 'AsyncPriorityEvent', 'AsyncDispatch', 'AsyncPriorityDispatch'])
