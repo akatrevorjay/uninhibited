@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+PATH_add ./bin
+
+dotenv
+
+export VIRTUAL_ENV="$HOME/.virtualenvs/${PWD##*/}"
+PATH_add "$VIRTUAL_ENV/bin"
+

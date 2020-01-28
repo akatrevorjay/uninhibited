@@ -1,4 +1,5 @@
-pytest
-mock
 coveralls
 faker
+pytest
+pytest-cov
+pytest-mock

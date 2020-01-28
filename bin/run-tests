@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -eo pipefail
+set -xv
+
+project_root="${0%/*}/.."
+
+: ${MPLBACKEND:="agg"}
+
+: ${PYTHONUNBUFFERED:=1}
+: ${PYTHONDONTWRITEBYTECODE:=1}
+
+# Filter out [info=1 warn=2 error=3] messages
+: ${TF_CPP_MIN_LOG_LEVEL:=3}
+
+: ${COVERAGE_PROCESS_START:="$project_root/.coveragerc"}
+
+export \
+	MPLBACKEND \
+	TF_CPP_MIN_LOG_LEVEL \
+	COVERAGE_PROCESS_START \
+	${!PYTHON*} \
+ && :
+
+cmd=(pytest)
+
+py_pkgs=(
+	$(python3 -c "import setup; [print(y) for y in set([x.split('.', 1)[0] for x in setup._conf['packages']])]")
+)
+
+case "$1" in
+	--ci)
+		shift
+
+		reports_dir="reports/junit"
+		mkdir -pv "$reports_dir"
+
+		cmd+=(
+			--durations=100
+
+			--cov-report="term-missing:skip-covered"
+
+			--junit-xml="$reports_dir/pytest.xml"
+
+			--cov-config="$project_root/.coveragerc"
+			--cov-branch
+			--no-cov-on-fail
+
+			-s -vvv
+		)
+
+		for pkg in "${py_pkgs[@]}"; do
+			cmd+=("--cov=$pkg")
+		done
+
+		;;
+esac
+
+cmd+=("$@")
+
+exec "${cmd[@]}"
+

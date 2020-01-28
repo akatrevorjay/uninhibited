@@ -1,0 +1,203 @@
+---
+version: 2
+jobs:
+  build:
+    # resource_class: xlarge
+    working_directory: /app/repo
+
+    docker:
+      - image: trevorj/circleci-builder:latest
+        # circleci sucks and removes your docker entrypoint
+        entrypoint: /image/bin/entrypoint
+        command: bash
+        auth:
+          username: $DOCKER_USERNAME
+          password: $DOCKER_PASSWORD
+
+    steps:
+      - setup_remote_docker:
+          version: 17.07.0-ce
+
+      - run:
+          name: prep
+          no_output_timeout: 2m
+          command: |
+            echo "# start" >> "$BASH_ENV"
+            set -xv -eo pipefail; source "$BASH_ENV"
+
+            # may as well
+            printf 'export PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_QUIET=1\n' >> "$BASH_ENV"
+
+            echo "$(date +"%Y-%V")" > ~/.ci-week
+
+      ##
+      ## checkout
+      ##
+
+      - restore_cache:
+          keys:
+            - source-v1-{{ .Branch }}-{{ checksum "~/.ci-week" }}
+            - source-v1-{{ .Branch }}-
+            - source-v1-
+
+      # Checkout repository
+      - checkout
+      - run:
+          name: checkout-submodules
+          no_output_timeout: 2m
+          command: |
+            set -xv -eo pipefail; source "$BASH_ENV"
+
+            git submodule sync --recursive
+            git submodule update --init --recursive
+
+      - save_cache:
+          key: source-v1-{{ .Branch }}-{{ checksum "~/.ci-week" }}
+          paths:
+            - ".git"
+
+      ##
+      ## app-prep {
+      ##
+
+      - run:
+          name: egg_info
+          no_output_timeout: 1m
+          command: |
+              set -xv -eo pipefail; source "$BASH_ENV"
+
+              rm -rfv *.egg-info build dist
+              python setup.py egg_info
+
+              (
+                echo "# ci-week=$(< ~/.ci-week)"
+                cat *.egg-info/requires.txt
+              ) > .ci-reqs
+
+      ##
+      ## deps {
+      ##
+
+      # Download and cache dependencies
+      - restore_cache:
+         keys:
+           - v1-venv-root-{{ arch }}-{{ checksum ".ci-reqs" }}
+           - v1-venv-root-{{ arch }}-
+
+      - run:
+          name: virtualenv-init
+          no_output_timeout: 1m
+          command: |
+            set -xv -eo pipefail; source "$BASH_ENV"
+
+            # venv: create (if needed)
+            venv="$PWD/.venv"
+            [[ -d "$venv" ]] || \
+              setup-venv-multiver -p python3.6 "$venv" 2.7 3.5 3.6 3.7
+
+            # venv: activate for now and the future
+            printf 'export VIRTUAL_ENV="%s"\n' "$venv" >> "$BASH_ENV"
+            printf 'export PATH="$VIRTUAL_ENV/bin:$PATH"\n' >> "$BASH_ENV"
+
+      - run:
+          name: install dependencies
+          command: |
+            set -xv -eo pipefail; source "$BASH_ENV"
+
+            pip install -r requirements/tests.pip
+
+            # pip wat -- avoids ContextualVersionConflict during upgrade of virtualenv and other packages (pip bug)
+            cmd=(tox --notest)
+            "${cmd[@]}" || "${cmd[@]}"
+
+      - save_cache:
+          paths:
+            - ./.venv
+            - ./.tox
+          key: v1-venv-root-{{ arch }}-{{ checksum ".ci-reqs" }}
+
+      ##
+      ## run-tests {
+      ##
+
+      - run:
+          name: run tests
+          command: |
+            set -xv -eo pipefail; source "$BASH_ENV"
+            shopt -s nullglob
+
+            # we want those sweet core dumps
+            ulimit -c unlimited
+            core_stash="/tmp/cores"
+
+            save-cores() {
+                local cores=(core.*)
+                [[ ${#cores} -ge 1 ]] || return 0
+
+                printf '[%s] saving cores to core_stash=%s' "$0" "${core_stash:?}" >&2
+                mv -v "${cores[@]}" "${core_stash:?}"
+            }
+
+            save-cores tox
+
+      ##
+      ## lint
+      ##
+
+      # - run:
+      #     name: lint
+      #     command: |
+      #      . ../venv/bin/activate
+      #
+      #       pip install -e '.[lint]'
+      #
+      #       coala --non-interactive -j 4
+
+      ##
+      ## collect
+      ##
+
+      - store_artifacts:
+          path: test-reports
+          destination: test-reports
+
+      - store_test_results:
+          path: reports/junit
+
+      - store_artifacts:
+          path: reports/junit
+          destination: test-reports
+
+      - store_artifacts:
+          path: /tmp/cores
+          destination: core-dumps
+
+      ##
+      ## run-tests }
+      ##
+
+      ##
+      ## deps }
+      ##
+
+      ##
+      ## publish
+      ##
+
+      - run:
+          name: coveralls
+          no_output_timeout: 1m
+          command: |
+            set -xv -eo pipefail; source "$BASH_ENV"
+
+            [[ -z "$COVERALLS_REPO_TOKEN" ]] || coveralls --service=circleci
+
+
+workflows:
+  version: 2
+
+  build:
+    jobs:
+      - build:
+          context: default
+
